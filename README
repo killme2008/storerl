@@ -1,0 +1,5 @@
+Storerl is a simple key-value disk store for elrang.
+
+Store=storerl_server:new("/home/dennis/programming/erlang","test"),
+ok=Store:add(<<"hello">>,"world"),
+{ok,Value}=Store:get(<<"dennis">>).
