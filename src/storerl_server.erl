@@ -19,8 +19,8 @@
                             terminate/2, code_change/3]).
 -define(OP_ADD,1).
 -define(OP_DEL,2).
-
--define(FILE_SIZE,67108864).
+-define(FILE_SIZE,508576).
+%-define(FILE_SIZE,67108864).
 -define(MAX_FILE_COUNT,1073741824).
 -define(I2L(X),integer_to_list(X)).
 -define(L2B(X),list_to_binary(X)).
@@ -32,15 +32,16 @@
 
 test()->
 Store=storerl_server:new("/home/dennis/programming/erlang","test"),
-io:format("size:~p~n",[Store:size()]),
-io:format("~p~n",[Store:add(<<"abc">>,"c")]),
 
-%io:format("~p~n",[Store:add(<<"key">>,<<"Value">>)]).
-%Store:update(<<"dennis">>,"hello storerl"),
-io:format("~p~n",[Store:get(<<"dennis">>)]),
-io:format("~p~n",[Store:get(<<"catty">>)]),
-io:format("~p~n",[Store:add(<<"dennis">>,<<"denniszhuang">>)]),
-io:format("~p~n",[Store:add(<<"catty">>,<<"catty">>)]),
+lists:foreach(fun(N)->
+                      Bin=list_to_binary(integer_to_list(N)),
+                      Store:add(Bin,Bin),
+                      Store:update(Bin,Bin),
+                      Store:erase(Bin)
+                      end,
+   lists:duplicate(1000000,1000000)),
+io:format("size:~p~n",[Store:size()]),
+
 Store:close().
 
 %io:format("~p~n",[Store:update(<<"key">>,<<"world">>)]),
@@ -83,11 +84,13 @@ init([Path,Name,Props]) ->
                          dfcounter=DFCounter2};
         true ->
             {Number,DataFile,LogFile}=new_file(-1,Path,Name),
+            io:format("cur num:~p~n",[Number]),
             DataFiles3=dict:store(Number,DataFile,DataFiles2),
             LogFiles3=dict:store(Number,LogFile,LogFiles2),
+            DFCounter3=dict:store(DataFile,0,DFCounter2),
             State=#state{path=Path,name=Name,df=DataFile,dfs=DataFiles3,lf=LogFile,lfs=LogFiles3,
                          number=Number,max_file_count=MaxFileCount,file_size=FileSize,
-                         indices=Indices2,dfcounter=DFCounter2}
+                         indices=Indices2,dfcounter=DFCounter3}
         end,
     {ok,State}.
 
@@ -270,18 +273,19 @@ read_opitem(Dict,LogFile,DataFile,DataFiles,LogFiles,Indices,DFCounter,Data)->
 
 
 inner_add(Key,Value,State=#state{df=DF,number=N,file_size=FileSize,path=Path,name=Name,lfs=LFS,dfs=DFS,
-                                 lf=LF,indices=Indices,dfcounter=DFCounter})->
+                                 lf=LF,indices=Indices,dfcounter=DFC})->
     {ok,Offset}=file:position(DF,cur),
-    io:format("offset:~p~n",[Offset]),
     if
         Offset >= FileSize ->
             {Number,DataFile,LogFile}=new_file(N,Path,Name),
             DataFiles=dict:store(Number,DataFile,DFS),
             LogFiles=dict:store(Number,LogFile,LFS),
+            DFCounter=dict:store(DataFile,0,DFC),
             {OpItem,Indices2,DFCounter2}=inner_add(Key,Value,0,DataFile,Number,LogFile,Indices,DFCounter),
-            {OpItem,State#state{number=Number,dfs=DataFiles,lfs=LogFiles,indices=Indices2,dfcounter=DFCounter2}};
+            {OpItem,State#state{df=DataFile,lf=LogFile,number=Number,dfs=DataFiles,
+                                lfs=LogFiles,indices=Indices2,dfcounter=DFCounter2}};
         true ->
-            {OpItem,Indices2,DFCounter2}=inner_add(Key,Value,Offset,DF,N,LF,Indices,DFCounter),
+            {OpItem,Indices2,DFCounter2}=inner_add(Key,Value,Offset,DF,N,LF,Indices,DFC),
             {OpItem,State#state{indices=Indices2,dfcounter=DFCounter2}}
         end.
 
@@ -337,7 +341,7 @@ inner_get(Key,DataFiles,Indices)->
 
 inner_remove(OpItem=#opitem{number=Num,key=Key,length=Len,offset=Offset},
              State=#state{dfs=DataFiles,lfs=LogFiles,number=Number,indices=Indices,
-                          dfcounter=DFCounter,df=CurDF,name=Name,path=Path})->
+                          dfcounter=DFCounter,df=CurDF,name=Name,path=Path,file_size=FileSize})->
     try dict:find(Num,DataFiles) of
         {ok,DataFile} ->
             try dict:find(Num,LogFiles) of
@@ -346,18 +350,28 @@ inner_remove(OpItem=#opitem{number=Num,key=Key,length=Len,offset=Offset},
                     ok=file:write(LogFile,gen_bin(NewOpItem)),
                     Indices2=dict:erase(Key,Indices),
                     {ok,Count}=dict:find(DataFile,DFCounter),
+                    {ok,Size}=file:position(DataFile,cur),
                     if
-                         (Count =:= 1) and (DataFile =:= CurDF) ->
-                            {NewNumber,NewDataFile,NewLogFile}=new_file(Number,Path,Name),
-                            NewDFS=dict:erase(Number,DataFiles),
-                            NewLFS=dict:erase(Number,LogFiles),
+                         (Count =:= 1) and (Size >= FileSize) ->
+                            NewDFS=dict:erase(Num,DataFiles),
+                            NewLFS=dict:erase(Num,LogFiles),
                             NewDFCounter=dict:erase(DataFile,DFCounter),
-                            file:close(DataFile),
-                            file:close(LogFile),
-                            file:delete(filename:join(Path,Name ++ "." ++ Number)),
-                            file:delete(filename:join(Path,Name ++ "." ++ Number ++ ".log")),
-                            {ok,State#state{df=NewDataFile,lf=NewLogFile,number=NewNumber,
-                                           dfs=NewDFS,lfs=NewLFS,dfcounter=NewDFCounter,indices=Indices2}};
+                            if
+                                DataFile =:= CurDF ->
+                                    delete_file(DataFile,LogFile,Path,Name,Num),
+                                    {NewNumber,NewDataFile,NewLogFile}=new_file(Number,Path,Name),
+                                    NewNewDFS=dict:store(NewNumber,NewDataFile,NewDFS),
+                                    NewNewLFS=dict:store(NewNumber,NewLogFile,NewLFS),
+                                    NewNewDFCounter=dict:store(NewDataFile,0,NewDFCounter),
+                                    {ok,State#state{df=NewDataFile,lf=NewLogFile,number=NewNumber,
+                                                    dfs=NewNewDFS,lfs=NewNewLFS,dfcounter=NewNewDFCounter,
+                                                    indices=Indices2}};
+                                true  ->
+                                    delete_file(DataFile,LogFile,Path,Name,Num),
+                                    {ok,State#state{dfs=NewDFS,lfs=NewLFS,dfcounter=NewDFCounter,indices=Indices2}}
+
+                            end;
+
                         true ->
                             NewDFCounter=dict:update_counter(DataFile,-1,DFCounter),
                             {ok,State#state{indices=Indices2,dfcounter=NewDFCounter}}
@@ -375,6 +389,12 @@ inner_remove(OpItem=#opitem{number=Num,key=Key,length=Len,offset=Offset},
         _:Reason->
             {{error,Reason},State}
     end.
+
+delete_file(DataFile,LogFile,Path,Name,Number)->
+    file:close(DataFile),
+    file:close(LogFile),
+    file:delete(filename:join(Path,Name ++ "." ++ ?I2L(Number))),
+    file:delete(filename:join(Path,Name ++ "." ++ ?I2L(Number) ++ ".log")).
 
 get_len(Data) when is_binary(Data)->
     size(Data);
