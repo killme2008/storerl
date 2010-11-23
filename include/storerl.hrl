@@ -25,8 +25,9 @@
 -define(I2L(X),integer_to_list(X)).
 -define(L2B(X),list_to_binary(X)).
 
-
 %%Server state
 -record(opitem,{op,key,number,offset,length}).
 -record(state,{dfs,lfs,df,lf,path,name,number,max_file_count,
                file_size,indices,dfcounter}).
+
+-define(FNAME_PATTERN,".*\\.(\\d+)$").

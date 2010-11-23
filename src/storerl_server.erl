@@ -70,6 +70,29 @@ init([Path,Name,Props]) ->
         end,
     {ok,State}.
 
+handle_call(compact,_From,State=#state{dfcounter=DFCounter})->
+    RE=re:compile(?FNAME_PATTERN),
+
+    RemovedDFS=dict:fold(fun(DataFile,Count,List)->
+                                 io:format("~p~n",[is_pid(DataFile)]),
+                                 io:format("~p ~p~n",[file:pid2name(DataFile),Count]),
+                                 if
+                                     Count =:= 0 ->
+                                         {ok,FileName}=file:pid2name(DataFile),
+                                         case re:run(FileName,RE) of
+                                             {match,[{_,_},{S,L}]} ->
+                                                 Num=list_to_integer(string:substr(FileName,S+1,L)),
+                                                 [{Num,DataFile} | List];
+                                             nomatch ->
+                                                 List
+                                         end;
+                                     true ->
+                                         List
+                                 end
+                         end,[],DFCounter),
+    {ok,NewState}=compact(RemovedDFS,State),
+    {reply,ok,NewState};
+
 handle_call(size, _From,State=#state{indices=Indices}) ->
     {reply,dict:size(Indices),State};
 
@@ -169,7 +192,7 @@ code_change(_Old, State, _Extra) ->
 init_load(Path,Name,DataFiles,LogFiles,Indices,DFCounter)->
     NM=Name ++ ".",
     Indices=dict:new(),
-    {ok,RE}=re:compile(Name ++ "\\.[0-9]+$"),
+    {ok,RE}=re:compile(Name ++ ?FNAME_PATTERN),
     {ok,Files}=file:list_dir(Path),
     IndexList=lists:sort(lists:map(fun(X)->
                                 list_to_integer(string:substr(X,string:len(NM)+1))
@@ -376,6 +399,17 @@ inner_remove(_OpItem=#opitem{number=Num,key=Key,length=Len,offset=Offset},
         error ->
             {{error,data_file_removed},State}
     end.
+
+compact([],State) ->
+    {ok,State};
+compact([{Num,DataFile}|T],State=#state{dfs=DataFiles,lfs=LogFiles,dfcounter=DFCounter,
+                                       path=Path,name=Name,number=Number}) ->
+    {ok,LogFile}=dict:find(Num,LogFiles),
+    NewLogFiles=dict:erase(Num,LogFiles),
+    NewDataFiles=dict:erase(Num,DataFiles),
+    NewDFCounter=dict:erase(DataFile,DFCounter),
+    delete_file(DataFile,LogFile,Path,Name,Number),
+    compact(T,State#state{dfs=NewDataFiles,lfs=NewLogFiles,dfcounter=NewDFCounter}).
 
 delete_file(DataFile,LogFile,Path,Name,Number)->
     ok=file:close(DataFile),

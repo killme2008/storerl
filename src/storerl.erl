@@ -11,7 +11,7 @@
 -author('killme2008@gmail.com').
 -vsn('0.1').
 
--export([add/2,update/2,get/1,erase/1,size/0,length/0,close/0,map/1]).
+-export([add/2,update/2,get/1,erase/1,size/0,length/0,close/0,map/1,server_id/0]).
 
 -type datal()  :: binary() | [char()].
 %% @doc Add a key-value pair to storel,if Key already exists in storerl then return error.
@@ -54,4 +54,9 @@ map(Fun) when is_function(Fun)->
                    'ok'.
 close()->
     gen_server:cast(Store,close).
+%% @doc Returns storel gen_server pid
+-spec server_id()->
+                 pid().
+server_id()->
+    Store.
 
