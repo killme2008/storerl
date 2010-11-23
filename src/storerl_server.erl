@@ -12,23 +12,14 @@
 -vsn('0.1').
 -behaviour(gen_server).
 -include("storerl.hrl").
-
--export([start/2,new/2]).
+%% initial a store instance
+-export([new/3,new/2]).
 -export([test/0]).
+
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
                             terminate/2, code_change/3]).
--define(OP_ADD,1).
--define(OP_DEL,2).
--define(FILE_SIZE,508576).
-%-define(FILE_SIZE,67108864).
--define(MAX_FILE_COUNT,1073741824).
--define(I2L(X),integer_to_list(X)).
--define(L2B(X),list_to_binary(X)).
 
-
--record(opitem,{op,key,number,offset,length}).
--record(state,{dfs,lfs,df,lf,path,name,number,max_file_count,
-               file_size,indices,dfcounter}).
+-type store_opts() :: {'file_size', integer()} | {'max_file_count', integer()}.
 
 test()->
 Store=storerl_server:new("/home/dennis/programming/erlang","test"),
@@ -43,15 +34,16 @@ lists:foreach(fun(N)->
 io:format("size:~p~n",[Store:size()]),
 
 Store:close().
-
-%io:format("~p~n",[Store:update(<<"key">>,<<"world">>)]),
-%io:format("~p~n",[Store:get(<<"key">>)]),
-%io:format("~p~n",[Store:erase(<<"key">>)]),
-%io:format("~p~n",[Store:get(<<"key">>)]).
-
+%% @doc New a storerl instance
+-spec new(string(), string()) -> tuple().
 new(Path,Name)->
-    {ok,Pid}=storerl_server:start(Path,Name),
+    new(Path,Name,[]).
+%% @doc New a storerl instance
+-spec new(string(), string(),[StoreOpts::store_opts()]) -> tuple().
+new(Path,Name,Props)->
+    {ok,Pid}=storerl_server:start(Path,Name,Props),
     storerl:new(Pid).
+
 start(Path,Name)->
     start(Path,Name,[]).
 start(Path,Name,Props)->
