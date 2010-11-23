@@ -1,0 +1,3 @@
+{application,storerl}.
+{packages,[]}.
+{modules,[benchmark,storerl,storerl_server]}.

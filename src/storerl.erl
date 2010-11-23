@@ -1,5 +1,16 @@
+%%%----------------------------------------------------------------------
+%%%
+%%% @copyright
+%%%
+%%% @author dennis <killme2008@gmail.com>
+%%% @doc storerl client
+%%% @end
+%%%
+%%%----------------------------------------------------------------------
 -module(storerl,[Store]).
 -author('killme2008@gmail.com').
+-vsn('0.1').
+
 -export([add/2,update/2,get/1,erase/1,size/0,length/0,close/0,map/1]).
 
 -type datal()  :: binary() | [char()].

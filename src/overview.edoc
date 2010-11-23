@@ -1,7 +1,7 @@
 ** this is the overview.doc file for the application 'storerl' **
 
 @author dennis <killme2008@gmail.com>
-@copyright 
+@copyright
 @version @VERSION@
 @title Welcome to the `storerl' application!
-@doc `storerl' is a ...
+@doc `storerl' is a simple key-value disk store for erlang

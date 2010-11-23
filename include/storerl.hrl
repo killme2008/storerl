@@ -18,9 +18,9 @@
 %%% op codes
 -define(OP_ADD,1).
 -define(OP_DEL,2).
-%% Max file size per datafile
--define(FILE_SIZE,508576).
-%% Max datafile count
+%% Max file size per datafile,default 64m.
+-define(FILE_SIZE,67108864).
+%% Max datafile count,default 1024*1024*1024
 -define(MAX_FILE_COUNT,1073741824).
 -define(I2L(X),integer_to_list(X)).
 -define(L2B(X),list_to_binary(X)).
