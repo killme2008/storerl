@@ -29,5 +29,5 @@
 -record(opitem,{op,key,number,offset,length}).
 -record(state,{dfs,lfs,df,lf,path,name,number,max_file_count,
                file_size,indices,dfcounter}).
-
+-define(MODES,[read,write,raw,delayed_write]).
 -define(FNAME_PATTERN,".*\\.(\\d+)$").

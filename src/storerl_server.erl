@@ -211,8 +211,8 @@ init_load(Path,Name,DataFiles,LogFiles,Indices,DFCounter)->
 read_log_file([],_Path,_Name,DataFiles,LogFiles,Indices,DFCounter) ->
     {DataFiles,LogFiles,Indices,DFCounter};
 read_log_file([Idx|Tail],Path,Name,DataFiles,LogFiles,Indices,DFCounter)->
-    {ok,DF}=file:open(filename:join(Path,Name ++"."++ ?I2L(Idx)),[raw,read,write]),
-    {ok,LF}=file:open(filename:join(Path,Name ++"."++ ?I2L(Idx) ++ ".log"),[raw,read,write]),
+    {ok,DF}=file:open(filename:join(Path,Name ++"."++ ?I2L(Idx)),?MODES),
+    {ok,LF}=file:open(filename:join(Path,Name ++"."++ ?I2L(Idx) ++ ".log"),?MODES),
     case read_opitem(LF,DF,DataFiles,LogFiles,Indices,DFCounter) of
         {ok,Dict,NewIndices,NewDFCounter} ->
             read_log_file(Tail,Path,Name,dict:store(Idx,DF,DataFiles),dict:store(Idx,LF,LogFiles)
@@ -333,8 +333,8 @@ new_file(Number,Path,Name)->
     NewNum=Number+1,
     DataFileName=filename:join([Path,Name ++ "." ++ ?I2L(NewNum)]),
     LogFileName=filename:join([Path,Name ++ "." ++ ?I2L(NewNum) ++ ".log"]),
-    {ok,DataFile}=file:open(DataFileName,[raw,read,write]),
-    {ok,LogFile}=file:open(LogFileName,[raw,read,write]),
+    {ok,DataFile}=file:open(DataFileName,?MODES),
+    {ok,LogFile}=file:open(LogFileName,?MODES),
     {NewNum,DataFile,LogFile}.
 
 inner_get(Key,DataFiles,Indices)->
